@@ -2,30 +2,18 @@ import { useState, useEffect } from 'preact/hooks';
 import type { Flower } from '@/types';
 import { FLOWER_TYPES, FLOWER_STATUSES } from '@/utils/constants';
 import { useFlowerStore } from '@/store/useFlowerStore';
+import { calculateFlowerStatus } from '@/services/flowerService';
+import { validateFlowerForm } from '@/services/validationService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
 import { Dialog } from '@/components/ui/Dialog';
 import { Plus } from 'lucide-preact';
 
-const calculateStatus = (currentStock: number, safeStock: number): '正常' | '偏低' | '缺货' | '停用' => {
-  if (currentStock === 0) return '缺货';
-  if (currentStock < safeStock) return '偏低';
-  return '正常';
-};
-
 interface FlowerFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editFlower?: Flower | null;
-}
-
-interface FormErrors {
-  id?: string;
-  name?: string;
-  type?: string;
-  currentStock?: string;
-  safeStock?: string;
 }
 
 const defaultFormData = {
@@ -39,7 +27,7 @@ const defaultFormData = {
 };
 
 export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) {
-  const { flowers, addFlower, updateFlower, flowerTypes, addFlowerType } = useFlowerStore();
+  const { flowers, addFlower, updateFlower, flowerTypes, addFlowerType, calculateStatus } = useFlowerStore();
   const isEdit = !!editFlower;
 
   const [formData, setFormData] = useState(defaultFormData);
@@ -66,41 +54,14 @@ export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) 
     }
   }, [open, editFlower]);
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const allFlowerTypes = flowerTypes?.length ? flowerTypes : FLOWER_TYPES;
 
   const validate = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.id.trim()) {
-      newErrors.id = '鲜花编号不能为空';
-    } else if (!isEdit && flowers.some(f => f.id === formData.id)) {
-      newErrors.id = '鲜花编号已存在';
-    } else if (isEdit && editFlower && formData.id !== editFlower.id && flowers.some(f => f.id === formData.id)) {
-      newErrors.id = '鲜花编号已存在';
-    }
-
-    if (!formData.name.trim()) {
-      newErrors.name = '鲜花名称不能为空';
-    }
-
-    if (!formData.type.trim()) {
-      newErrors.type = '鲜花类型不能为空';
-    }
-
-    const currentStock = parseInt(formData.currentStock);
-    if (isNaN(currentStock) || currentStock < 0) {
-      newErrors.currentStock = '当前库存必须是非负整数';
-    }
-
-    const safeStock = parseInt(formData.safeStock);
-    if (isNaN(safeStock) || safeStock < 0) {
-      newErrors.safeStock = '安全库存必须是非负整数';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const result = validateFlowerForm(formData, isEdit, flowers, editFlower?.id);
+    setErrors(result.errors);
+    return result.valid;
   };
 
   const handleAddNewType = () => {
@@ -136,7 +97,7 @@ export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) 
       });
     } else {
       const now = new Date().toISOString();
-      const status = calculateStatus(parseInt(formData.currentStock), parseInt(formData.safeStock));
+      const status = calculateFlowerStatus(parseInt(formData.currentStock), parseInt(formData.safeStock));
       addFlower({
         id: formData.id.trim(),
         ...flowerData,
@@ -151,15 +112,7 @@ export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) 
   };
 
   const resetForm = () => {
-    setFormData({
-      id: '',
-      name: '',
-      type: FLOWER_TYPES[0],
-      currentStock: '0',
-      safeStock: '10',
-      location: '',
-      status: '正常',
-    });
+    setFormData(defaultFormData);
     setErrors({});
   };
 

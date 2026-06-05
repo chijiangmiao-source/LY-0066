@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'preact/hooks';
 import type { Flower } from '@/types';
 import { useFlowerStore } from '@/store/useFlowerStore';
-import { getTodayDateString, cn, isValidOperatorName } from '@/utils/helpers';
+import { getTodayDateString, cn } from '@/utils/helpers';
+import { validateStocktakeForm } from '@/services/validationService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
@@ -12,12 +13,6 @@ interface StocktakeFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedFlower?: Flower | null;
-}
-
-interface FormErrors {
-  flowerId?: string;
-  actualStock?: string;
-  operator?: string;
 }
 
 interface StocktakeResult {
@@ -39,7 +34,7 @@ export function StocktakeForm({ open, onOpenChange, selectedFlower }: StocktakeF
     remark: '',
   });
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [result, setResult] = useState<StocktakeResult | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -64,27 +59,9 @@ export function StocktakeForm({ open, onOpenChange, selectedFlower }: StocktakeF
   }, [open, selectedFlower]);
 
   const validate = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.flowerId) {
-      newErrors.flowerId = '请选择或输入鲜花编号';
-    } else if (!flowers.find(f => f.id === formData.flowerId)) {
-      newErrors.flowerId = '鲜花编号不存在';
-    }
-
-    const actualStock = parseInt(formData.actualStock);
-    if (formData.actualStock === '' || isNaN(actualStock) || actualStock < 0) {
-      newErrors.actualStock = '实际库存必须是非负整数';
-    }
-
-    if (!formData.operator.trim()) {
-      newErrors.operator = '请输入经办人';
-    } else if (!isValidOperatorName(formData.operator)) {
-      newErrors.operator = '经办人姓名须为2-20位中文或英文字母';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const result = validateStocktakeForm(formData, flowers);
+    setErrors(result.errors);
+    return result.valid;
   };
 
   const handleSubmit = (e: Event) => {

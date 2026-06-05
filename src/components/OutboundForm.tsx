@@ -2,7 +2,8 @@ import { useState, useEffect } from 'preact/hooks';
 import type { Flower, UsageType } from '@/types';
 import { useFlowerStore } from '@/store/useFlowerStore';
 import { USAGE_TYPES } from '@/utils/constants';
-import { getTodayDateString, isValidRecipientName } from '@/utils/helpers';
+import { getTodayDateString } from '@/utils/helpers';
+import { validateOutboundForm } from '@/services/validationService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
@@ -13,14 +14,6 @@ interface OutboundFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedFlower?: Flower | null;
-}
-
-interface FormErrors {
-  flowerId?: string;
-  quantity?: string;
-  date?: string;
-  recipient?: string;
-  usage?: string;
 }
 
 export function OutboundForm({ open, onOpenChange, selectedFlower }: OutboundFormProps) {
@@ -37,7 +30,7 @@ export function OutboundForm({ open, onOpenChange, selectedFlower }: OutboundFor
     remark: '',
   });
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string>('');
 
   useEffect(() => {
@@ -58,35 +51,9 @@ export function OutboundForm({ open, onOpenChange, selectedFlower }: OutboundFor
   const currentFlower = flowers.find((f) => f.id === formData.flowerId);
 
   const validate = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.flowerId) {
-      newErrors.flowerId = '请选择鲜花';
-    }
-
-    const quantity = parseInt(formData.quantity);
-    if (isNaN(quantity) || quantity <= 0) {
-      newErrors.quantity = '出库数量必须大于 0';
-    } else if (currentFlower && quantity > currentFlower.currentStock) {
-      newErrors.quantity = `出库数量不能超过当前库存（${currentFlower.currentStock} 枝）`;
-    }
-
-    if (!formData.date) {
-      newErrors.date = '请选择出库日期';
-    }
-
-    if (!formData.recipient.trim()) {
-      newErrors.recipient = '请输入领用人';
-    } else if (!isValidRecipientName(formData.recipient)) {
-      newErrors.recipient = '领用人姓名须为2-20位中文或英文字母';
-    }
-
-    if (!formData.usage) {
-      newErrors.usage = '请选择用途类型';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const result = validateOutboundForm(formData, currentFlower);
+    setErrors(result.errors);
+    return result.valid;
   };
 
   const handleSubmit = (e: Event) => {

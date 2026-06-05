@@ -1,7 +1,10 @@
 import { useState } from 'preact/hooks';
-import { Flower2, Plus, Package, AlertTriangle, TrendingUp, TrendingDown, ClipboardCheck, ArrowUpDown, XCircle, AlertCircle, LayoutGrid, LogOut, BarChart3, Users, CalendarDays, Gift, Sparkles, Boxes, Layers } from 'lucide-preact';
+import { Flower2, Plus, Package, TrendingUp, TrendingDown, ClipboardCheck, ArrowUpDown, XCircle, AlertCircle, LayoutGrid, LogOut, BarChart3, Users, CalendarDays, Gift, Sparkles, Layers } from 'lucide-preact';
 import type { Flower, RecordType, FlowerStatus, PackageTemplate } from '@/types';
 import { useFlowerStore } from '@/store/useFlowerStore';
+import { useFlowerStats } from '@/hooks/useFlowerStats';
+import { useOutboundStats } from '@/hooks/useOutboundStats';
+import { usePackageStats } from '@/hooks/usePackageStats';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/StatCard';
 import { StatusDistributionChart, RecordTrendChart, OutboundTrendChart, UsageDistributionChart, PopularPackageChart, PackageUsageTrendChart, PackageTypeDistributionChart } from '@/components/Charts';
@@ -15,12 +18,15 @@ import { PackageForm } from '@/components/PackageForm';
 import { PackageUsageForm } from '@/components/PackageUsageForm';
 import { PackageList } from '@/components/PackageList';
 import { PackageDetail } from '@/components/PackageDetail';
-import { cn, getTodayDateString } from '@/utils/helpers';
+import { cn } from '@/utils/helpers';
 
 type ActiveView = 'inventory' | 'outbound' | 'package';
 
 export function App() {
-  const { flowers, records, outboundRecords, packageTemplates, packageUsageRecords, getPopularPackages } = useFlowerStore();
+  const { flowers, records, outboundRecords, packageTemplates, packageUsageRecords } = useFlowerStore();
+  const flowerStats = useFlowerStats();
+  const outboundStats = useOutboundStats();
+  const packageStats = usePackageStats(5);
 
   const [flowerFormOpen, setFlowerFormOpen] = useState(false);
   const [editFlower, setEditFlower] = useState<Flower | null>(null);
@@ -46,27 +52,6 @@ export function App() {
 
   const [quickFilter, setQuickFilter] = useState<'all' | 'low' | 'out'>('all');
   const [activeView, setActiveView] = useState<ActiveView>('inventory');
-
-  const totalStock = flowers.reduce((sum, f) => sum + f.currentStock, 0);
-  const lowStockCount = flowers.filter(f => f.status === '偏低').length;
-  const outOfStockCount = flowers.filter(f => f.status === '缺货').length;
-  const totalReplenish = records.filter(r => r.type === '补货').reduce((sum, r) => sum + r.quantity, 0);
-  const totalWaste = records.filter(r => r.type === '损耗').reduce((sum, r) => sum + r.quantity, 0);
-  const totalSurplus = records.filter(r => r.type === '盘盈').reduce((sum, r) => sum + r.quantity, 0);
-  const totalShortage = records.filter(r => r.type === '盘亏').reduce((sum, r) => sum + r.quantity, 0);
-
-  const totalOutbound = outboundRecords.reduce((sum, r) => sum + r.quantity, 0);
-  const todayOutbound = outboundRecords.filter(r => r.date === getTodayDateString()).reduce((sum, r) => sum + r.quantity, 0);
-  const recipientCount = outboundRecords.length;
-
-  const totalPackages = packageTemplates.length;
-  const totalPackageUsage = packageUsageRecords.length;
-  const todayPackageUsage = packageUsageRecords.filter(r => r.date === getTodayDateString()).length;
-  const totalPackageFlowers = packageUsageRecords.reduce(
-    (sum, r) => sum + r.items.reduce((s, i) => s + i.quantity, 0),
-    0
-  );
-  const popularPackages = getPopularPackages(5);
 
   const handleEditFlower = (flower: Flower) => {
     setEditFlower(flower);
@@ -184,7 +169,7 @@ export function App() {
                     )}
                   >
                     <XCircle className="h-4 w-4 mr-1" />
-                    缺货 ({outOfStockCount})
+                    缺货 ({flowerStats.outOfStockCount})
                   </Button>
                   <Button
                     variant="outline"
@@ -196,7 +181,7 @@ export function App() {
                     )}
                   >
                     <AlertCircle className="h-4 w-4 mr-1" />
-                    偏低 ({lowStockCount})
+                    偏低 ({flowerStats.lowStockCount})
                   </Button>
                   <Button
                     variant="outline"
@@ -286,39 +271,39 @@ export function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
               <StatCard
                 title="库存总量"
-                value={`${totalStock} 枝`}
+                value={`${flowerStats.totalStock} 枝`}
                 icon={<Package className="h-5 w-5" />}
                 color="green"
               />
               <StatCard
                 title="库存偏低"
-                value={`${lowStockCount} 种`}
+                value={`${flowerStats.lowStockCount} 种`}
                 icon={<AlertCircle className="h-5 w-5" />}
-                color={lowStockCount > 0 ? 'yellow' : 'green'}
+                color={flowerStats.lowStockCount > 0 ? 'yellow' : 'green'}
               />
               <StatCard
                 title="缺货品种"
-                value={`${outOfStockCount} 种`}
+                value={`${flowerStats.outOfStockCount} 种`}
                 icon={<XCircle className="h-5 w-5" />}
-                color={outOfStockCount > 0 ? 'red' : 'green'}
+                color={flowerStats.outOfStockCount > 0 ? 'red' : 'green'}
               />
               <StatCard
                 title="累计补货"
-                value={`${totalReplenish} 枝`}
+                value={`${flowerStats.totalReplenish} 枝`}
                 icon={<TrendingUp className="h-5 w-5" />}
                 color="blue"
               />
               <StatCard
                 title="累计损耗"
-                value={`${totalWaste} 枝`}
+                value={`${flowerStats.totalWaste} 枝`}
                 icon={<TrendingDown className="h-5 w-5" />}
                 color="red"
               />
               <StatCard
                 title="盘盈/盘亏"
-                value={`+${totalSurplus} / -${totalShortage}`}
+                value={`+${flowerStats.totalSurplus} / -${flowerStats.totalShortage}`}
                 icon={<ArrowUpDown className="h-5 w-5" />}
-                color={totalShortage > totalSurplus ? 'yellow' : 'purple'}
+                color={flowerStats.totalShortage > flowerStats.totalSurplus ? 'yellow' : 'purple'}
               />
             </div>
 
@@ -347,25 +332,25 @@ export function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard
                 title="累计出库"
-                value={`${totalOutbound} 枝`}
+                value={`${outboundStats.totalOutbound} 枝`}
                 icon={<LogOut className="h-5 w-5" />}
                 color="purple"
               />
               <StatCard
                 title="今日出库"
-                value={`${todayOutbound} 枝`}
+                value={`${outboundStats.todayOutbound} 枝`}
                 icon={<CalendarDays className="h-5 w-5" />}
                 color="blue"
               />
               <StatCard
                 title="出库记录"
-                value={`${outboundRecords.length} 条`}
+                value={`${outboundStats.recordCount} 条`}
                 icon={<BarChart3 className="h-5 w-5" />}
                 color="green"
               />
               <StatCard
                 title="领用人次"
-                value={`${recipientCount} 次`}
+                value={`${outboundStats.recipientCount} 次`}
                 icon={<Users className="h-5 w-5" />}
                 color="yellow"
               />
@@ -389,25 +374,25 @@ export function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard
                 title="套餐模板"
-                value={`${totalPackages} 个`}
+                value={`${packageStats.totalPackages} 个`}
                 icon={<Layers className="h-5 w-5" />}
                 color="indigo"
               />
               <StatCard
                 title="累计领用"
-                value={`${totalPackageUsage} 次`}
+                value={`${packageStats.totalPackageUsage} 次`}
                 icon={<Gift className="h-5 w-5" />}
                 color="purple"
               />
               <StatCard
                 title="今日领用"
-                value={`${todayPackageUsage} 次`}
+                value={`${packageStats.todayPackageUsage} 次`}
                 icon={<CalendarDays className="h-5 w-5" />}
                 color="blue"
               />
               <StatCard
                 title="领用鲜花"
-                value={`${totalPackageFlowers} 枝`}
+                value={`${packageStats.totalPackageFlowers} 枝`}
                 icon={<Sparkles className="h-5 w-5" />}
                 color="green"
               />
@@ -420,7 +405,7 @@ export function App() {
               </div>
               <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">热门套餐排行</h3>
-                <PopularPackageChart popularPackages={popularPackages} width={280} height={220} />
+                <PopularPackageChart popularPackages={packageStats.popularPackages} width={280} height={220} />
               </div>
               <div className="lg:col-span-1 bg-white rounded-xl p-5 shadow-sm border border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">套餐使用趋势</h3>

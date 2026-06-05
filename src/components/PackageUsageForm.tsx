@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import type { PackageTemplate, UsageType } from '@/types';
-import { USAGE_TYPES, PACKAGE_TYPE_COLORS, STATUS_COLORS } from '@/utils/constants';
+import { USAGE_TYPES, PACKAGE_TYPE_COLORS } from '@/utils/constants';
 import { useFlowerStore } from '@/store/useFlowerStore';
-import { getTodayDateString, isValidRecipientName, isValidOperatorName, cn } from '@/utils/helpers';
+import { getTodayDateString, cn } from '@/utils/helpers';
+import { validatePackageUsageForm } from '@/services/validationService';
+import { canDeductPackageStock } from '@/services/flowerService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
@@ -13,14 +15,6 @@ interface PackageUsageFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedPackage?: PackageTemplate | null;
-}
-
-interface FormErrors {
-  packageId?: string;
-  date?: string;
-  recipient?: string;
-  usage?: string;
-  createdBy?: string;
 }
 
 export function PackageUsageForm({ open, onOpenChange, selectedPackage }: PackageUsageFormProps) {
@@ -35,7 +29,7 @@ export function PackageUsageForm({ open, onOpenChange, selectedPackage }: Packag
     remark: '',
   });
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
@@ -60,54 +54,24 @@ export function PackageUsageForm({ open, onOpenChange, selectedPackage }: Packag
 
   const stockStatus = useMemo(() => {
     if (!selectedPkg) return { available: false, items: [] as { name: string; need: number; stock: number; ok: boolean }[] };
-    const items = selectedPkg.flowers.map((f) => {
-      const flower = flowers.find((fl) => fl.id === f.flowerId);
-      return {
-        name: flower?.name || f.flowerName || '未知',
-        need: f.quantity,
-        stock: flower?.currentStock ?? 0,
-        ok: !!flower && flower.currentStock >= f.quantity,
-      };
-    });
+    const result = canDeductPackageStock(flowers, selectedPkg.flowers);
     return {
-      available: items.every((i) => i.ok),
-      items,
+      available: result.ok,
+      items: result.details.map((d) => ({
+        name: d.flowerName,
+        need: d.need,
+        stock: d.stock,
+        ok: d.ok,
+      })),
     };
   }, [selectedPkg, flowers]);
 
   const totalFlowers = selectedPkg?.flowers.reduce((sum, f) => sum + f.quantity, 0) || 0;
 
   const validate = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.packageId) {
-      newErrors.packageId = '请选择套餐';
-    } else if (!stockStatus.available) {
-      newErrors.packageId = '套餐所需鲜花库存不足';
-    }
-
-    if (!formData.date) {
-      newErrors.date = '请选择使用日期';
-    }
-
-    if (!formData.recipient.trim()) {
-      newErrors.recipient = '请输入领用人';
-    } else if (!isValidRecipientName(formData.recipient)) {
-      newErrors.recipient = '领用人姓名须为2-20位中文或英文字母';
-    }
-
-    if (!formData.usage) {
-      newErrors.usage = '请选择用途类型';
-    }
-
-    if (!formData.createdBy.trim()) {
-      newErrors.createdBy = '请输入经办人';
-    } else if (!isValidOperatorName(formData.createdBy)) {
-      newErrors.createdBy = '经办人姓名须为2-20位中文或英文字母';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const result = validatePackageUsageForm(formData, stockStatus.available);
+    setErrors(result.errors);
+    return result.valid;
   };
 
   const handleSubmit = (e: Event) => {

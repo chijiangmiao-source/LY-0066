@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'preact/hooks';
 import type { Flower, RecordType } from '@/types';
 import { useFlowerStore } from '@/store/useFlowerStore';
-import { getTodayDateString, isValidOperatorName } from '@/utils/helpers';
+import { getTodayDateString } from '@/utils/helpers';
+import { validateRecordForm } from '@/services/validationService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
@@ -12,12 +13,6 @@ interface RecordFormProps {
   onOpenChange: (open: boolean) => void;
   type: RecordType;
   selectedFlower?: Flower | null;
-}
-
-interface FormErrors {
-  flowerId?: string;
-  quantity?: string;
-  operator?: string;
 }
 
 export function RecordForm({ open, onOpenChange, type, selectedFlower }: RecordFormProps) {
@@ -33,32 +28,14 @@ export function RecordForm({ open, onOpenChange, type, selectedFlower }: RecordF
     remark: '',
   });
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const selectedFlowerData = flowers.find(f => f.id === formData.flowerId);
 
   const validate = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.flowerId) {
-      newErrors.flowerId = '请选择鲜花';
-    }
-
-    const quantity = parseInt(formData.quantity);
-    if (isNaN(quantity) || quantity <= 0) {
-      newErrors.quantity = '数量必须大于 0';
-    } else if (type === '损耗' && selectedFlowerData && quantity > selectedFlowerData.currentStock) {
-      newErrors.quantity = `损耗数量不能超过当前库存（${selectedFlowerData.currentStock}）`;
-    }
-
-    if (!formData.operator.trim()) {
-      newErrors.operator = '请输入经办人';
-    } else if (!isValidOperatorName(formData.operator)) {
-      newErrors.operator = '经办人姓名须为2-20位中文或英文字母';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const result = validateRecordForm(formData, type, selectedFlowerData);
+    setErrors(result.errors);
+    return result.valid;
   };
 
   const handleSubmit = (e: Event) => {

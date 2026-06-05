@@ -2,7 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import type { PackageTemplate, PackageType, PackageFlowerItem } from '@/types';
 import { PACKAGE_TYPES } from '@/utils/constants';
 import { useFlowerStore } from '@/store/useFlowerStore';
-import { isValidOperatorName } from '@/utils/helpers';
+import { validatePackageForm } from '@/services/validationService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
@@ -13,13 +13,6 @@ interface PackageFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editPackage?: PackageTemplate | null;
-}
-
-interface FormErrors {
-  name?: string;
-  type?: string;
-  createdBy?: string;
-  flowers?: string;
 }
 
 const defaultFormData = {
@@ -35,7 +28,7 @@ export function PackageForm({ open, onOpenChange, editPackage }: PackageFormProp
   const isEdit = !!editPackage;
 
   const [formData, setFormData] = useState(defaultFormData);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState('');
 
   const availableFlowers = flowers.filter((f) => f.status !== '停用');
@@ -99,45 +92,9 @@ export function PackageForm({ open, onOpenChange, editPackage }: PackageFormProp
   const totalFlowers = formData.flowers.reduce((sum, f) => sum + f.quantity, 0);
 
   const validate = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = '套餐名称不能为空';
-    }
-
-    if (!formData.type) {
-      newErrors.type = '请选择套餐类型';
-    }
-
-    if (!formData.createdBy.trim()) {
-      newErrors.createdBy = '请输入创建人';
-    } else if (!isValidOperatorName(formData.createdBy)) {
-      newErrors.createdBy = '创建人姓名须为2-20位中文或英文字母';
-    }
-
-    if (formData.flowers.length === 0) {
-      newErrors.flowers = '请至少添加一种鲜花';
-    } else {
-      const flowerIdSet = new Set<string>();
-      for (const item of formData.flowers) {
-        if (!item.flowerId) {
-          newErrors.flowers = '请选择所有鲜花种类';
-          break;
-        }
-        if (item.quantity <= 0) {
-          newErrors.flowers = '所有鲜花数量必须大于 0';
-          break;
-        }
-        if (flowerIdSet.has(item.flowerId)) {
-          newErrors.flowers = '鲜花种类不能重复';
-          break;
-        }
-        flowerIdSet.add(item.flowerId);
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const result = validatePackageForm(formData);
+    setErrors(result.errors);
+    return result.valid;
   };
 
   const handleSubmit = (e: Event) => {
