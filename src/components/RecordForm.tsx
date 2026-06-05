@@ -1,7 +1,7 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import type { Flower, RecordType } from '@/types';
 import { useFlowerStore } from '@/store/useFlowerStore';
-import { getTodayDateString } from '@/utils/helpers';
+import { getTodayDateString, isValidOperatorName } from '@/utils/helpers';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
@@ -53,6 +53,8 @@ export function RecordForm({ open, onOpenChange, type, selectedFlower }: RecordF
 
     if (!formData.operator.trim()) {
       newErrors.operator = '请输入经办人';
+    } else if (!isValidOperatorName(formData.operator)) {
+      newErrors.operator = '经办人姓名须为2-20位中文或英文字母';
     }
 
     setErrors(newErrors);

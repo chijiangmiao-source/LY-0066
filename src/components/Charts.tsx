@@ -90,7 +90,14 @@ interface RecordChartProps {
   height?: number;
 }
 
-export function RecordTrendChart({ records, width = 500, height = 250 }: RecordChartProps) {
+const CHART_ITEMS = [
+  { key: '补货', color: '#10b981' },
+  { key: '盘盈', color: '#3b82f6' },
+  { key: '损耗', color: '#ef4444' },
+  { key: '盘亏', color: '#f97316' },
+] as const;
+
+export function RecordTrendChart({ records, width = 580, height = 250 }: RecordChartProps) {
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() - (6 - i));
@@ -102,7 +109,9 @@ export function RecordTrendChart({ records, width = 500, height = 250 }: RecordC
     return {
       date: date.slice(5),
       补货: dayRecords.filter(r => r.type === '补货').reduce((sum, r) => sum + r.quantity, 0),
+      盘盈: dayRecords.filter(r => r.type === '盘盈').reduce((sum, r) => sum + r.quantity, 0),
       损耗: dayRecords.filter(r => r.type === '损耗').reduce((sum, r) => sum + r.quantity, 0),
+      盘亏: dayRecords.filter(r => r.type === '盘亏').reduce((sum, r) => sum + r.quantity, 0),
     };
   });
 
@@ -111,12 +120,14 @@ export function RecordTrendChart({ records, width = 500, height = 250 }: RecordC
   const innerHeight = height - margin.top - margin.bottom;
 
   const maxValue = Math.max(
-    ...dailyData.map(d => Math.max(d.补货, d.损耗)),
+    ...dailyData.map(d => Math.max(d.补货, d.盘盈, d.损耗, d.盘亏)),
     1
   );
 
-  const barWidth = innerWidth / dailyData.length / 2 - 8;
-  const xScale = (i: number) => margin.left + i * (innerWidth / dailyData.length);
+  const groupWidth = innerWidth / dailyData.length;
+  const barGap = 2;
+  const barWidth = (groupWidth - barGap * (CHART_ITEMS.length - 1)) / CHART_ITEMS.length;
+  const xScale = (i: number) => margin.left + i * groupWidth;
   const yScale = (value: number) => margin.top + innerHeight - (value / maxValue) * innerHeight;
 
   return (
@@ -138,7 +149,7 @@ export function RecordTrendChart({ records, width = 500, height = 250 }: RecordC
           stroke="#9ca3af"
           strokeWidth={1}
         />
-        
+
         {[0, 0.5, 1].map((ratio) => (
           <text
             key={ratio}
@@ -153,30 +164,27 @@ export function RecordTrendChart({ records, width = 500, height = 250 }: RecordC
         ))}
 
         {dailyData.map((d, i) => {
-          const x = xScale(i);
-          const replenishHeight = innerHeight - (yScale(d.补货) - margin.top);
-          const wasteHeight = innerHeight - (yScale(d.损耗) - margin.top);
-          
+          const groupX = xScale(i);
+
           return (
             <g key={d.date}>
-              <rect
-                x={x}
-                y={yScale(d.补货)}
-                width={barWidth}
-                height={replenishHeight}
-                fill="#10b981"
-                rx={2}
-              />
-              <rect
-                x={x + barWidth + 8}
-                y={yScale(d.损耗)}
-                width={barWidth}
-                height={wasteHeight}
-                fill="#ef4444"
-                rx={2}
-              />
+              {CHART_ITEMS.map((item, idx) => {
+                const value = d[item.key as keyof typeof d] as number;
+                const barHeight = innerHeight - (yScale(value) - margin.top);
+                return (
+                  <rect
+                    key={item.key}
+                    x={groupX + idx * (barWidth + barGap)}
+                    y={yScale(value)}
+                    width={barWidth}
+                    height={barHeight}
+                    fill={item.color}
+                    rx={2}
+                  />
+                );
+              })}
               <text
-                x={x + barWidth + 4}
+                x={groupX + groupWidth / 2}
                 y={height - 20}
                 fill="#6b7280"
                 fontSize={11}
@@ -188,15 +196,13 @@ export function RecordTrendChart({ records, width = 500, height = 250 }: RecordC
           );
         })}
       </svg>
-      <div className="flex gap-6 mt-2">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-green-500" />
-          <span className="text-xs text-gray-600">补货</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-red-500" />
-          <span className="text-xs text-gray-600">损耗</span>
-        </div>
+      <div className="flex flex-wrap gap-4 mt-2 justify-center">
+        {CHART_ITEMS.map(item => (
+          <div key={item.key} className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: item.color }} />
+            <span className="text-xs text-gray-600">{item.key}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import type { Flower } from '@/types';
 import { useFlowerStore } from '@/store/useFlowerStore';
-import { getTodayDateString, cn } from '@/utils/helpers';
+import { getTodayDateString, cn, isValidOperatorName } from '@/utils/helpers';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectItem } from '@/components/ui/Select';
@@ -79,6 +79,8 @@ export function StocktakeForm({ open, onOpenChange, selectedFlower }: StocktakeF
 
     if (!formData.operator.trim()) {
       newErrors.operator = '请输入经办人';
+    } else if (!isValidOperatorName(formData.operator)) {
+      newErrors.operator = '经办人姓名须为2-20位中文或英文字母';
     }
 
     setErrors(newErrors);
@@ -161,7 +163,7 @@ export function StocktakeForm({ open, onOpenChange, selectedFlower }: StocktakeF
             {selectedFlowerData && (
               <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
                 <div className="p-3 bg-white rounded-lg">
-                  <p className="text-gray-500">系统库存</p>
+                  <p className="text-gray-500">盘点前系统库存</p>
                   <p className="font-bold text-lg text-gray-900">{systemStock}</p>
                 </div>
                 <div className="p-3 bg-white rounded-lg">

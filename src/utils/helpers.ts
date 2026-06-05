@@ -32,3 +32,10 @@ export function formatDateTime(date: string | Date): string {
 export function getTodayDateString(): string {
   return new Date().toISOString().split('T')[0];
 }
+
+export function isValidOperatorName(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  const validPattern = /^[\u4e00-\u9fa5a-zA-Z·]+$/;
+  return validPattern.test(trimmed) && trimmed.length >= 2 && trimmed.length <= 20;
+}
