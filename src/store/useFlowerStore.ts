@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Flower, OperationRecord, FlowerStatus, FlowerStore, StocktakeData, OutboundRecord, OutboundFilters } from '@/types';
+import type {
+  Flower,
+  OperationRecord,
+  FlowerStatus,
+  FlowerStore,
+  StocktakeData,
+  OutboundRecord,
+  OutboundFilters,
+  PackageTemplate,
+  PackageUsageRecord,
+  PackageFilters,
+  PackageUsageFilters,
+  UsageType,
+} from '@/types';
 import { generateId, getTodayDateString, isDateInRange } from '@/utils/helpers';
 import { FLOWER_TYPES } from '@/utils/constants';
 
@@ -133,6 +146,87 @@ const initialOutboundRecords: OutboundRecord[] = [
   },
 ];
 
+const initialPackageTemplates: PackageTemplate[] = [
+  {
+    id: 'PKG001',
+    name: '标准告别仪式花篮',
+    type: '告别仪式花篮',
+    description: '适用于遗体告别仪式的标准花篮，庄重大气',
+    flowers: [
+      { flowerId: 'FL001', flowerName: '白菊', quantity: 30 },
+      { flowerId: 'FL003', flowerName: '白百合', quantity: 6 },
+      { flowerId: 'FL008', flowerName: '满天星', quantity: 10 },
+    ],
+    createdBy: '管理员',
+    createdAt: '2026-05-10T00:00:00.000Z',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  },
+  {
+    id: 'PKG002',
+    name: '温馨追思会花束',
+    type: '追思会花束',
+    description: '温馨雅致的追思会花束，适合追思悼念场合',
+    flowers: [
+      { flowerId: 'FL005', flowerName: '康乃馨', quantity: 15 },
+      { flowerId: 'FL004', flowerName: '粉百合', quantity: 5 },
+      { flowerId: 'FL007', flowerName: '勿忘我', quantity: 8 },
+    ],
+    createdBy: '管理员',
+    createdAt: '2026-05-12T00:00:00.000Z',
+    updatedAt: '2026-05-20T00:00:00.000Z',
+  },
+  {
+    id: 'PKG003',
+    name: '简约日常祭扫套餐',
+    type: '日常祭扫套餐',
+    description: '简洁实用的日常祭扫用花套餐',
+    flowers: [
+      { flowerId: 'FL001', flowerName: '白菊', quantity: 10 },
+      { flowerId: 'FL002', flowerName: '黄菊', quantity: 10 },
+    ],
+    createdBy: '张三',
+    createdAt: '2026-05-18T00:00:00.000Z',
+    updatedAt: '2026-05-25T00:00:00.000Z',
+  },
+];
+
+const initialPackageUsageRecords: PackageUsageRecord[] = [
+  {
+    id: generateId(),
+    packageId: 'PKG001',
+    packageName: '标准告别仪式花篮',
+    packageType: '告别仪式花篮',
+    date: getTodayDateString(),
+    recipient: '陈家属',
+    usage: '告别仪式',
+    createdBy: '张三',
+    remark: '陈老先生告别仪式',
+    createdAt: new Date().toISOString(),
+    items: [
+      { flowerId: 'FL001', flowerName: '白菊', flowerType: '白菊', quantity: 30 },
+      { flowerId: 'FL003', flowerName: '白百合', flowerType: '白百合', quantity: 6 },
+      { flowerId: 'FL008', flowerName: '满天星', flowerType: '满天星', quantity: 10 },
+    ],
+  },
+  {
+    id: generateId(),
+    packageId: 'PKG002',
+    packageName: '温馨追思会花束',
+    packageType: '追思会花束',
+    date: getTodayDateString(),
+    recipient: '刘家属',
+    usage: '追思会',
+    createdBy: '李四',
+    remark: '刘女士追思纪念会',
+    createdAt: new Date().toISOString(),
+    items: [
+      { flowerId: 'FL005', flowerName: '康乃馨', flowerType: '康乃馨', quantity: 15 },
+      { flowerId: 'FL004', flowerName: '粉百合', flowerType: '粉百合', quantity: 5 },
+      { flowerId: 'FL007', flowerName: '勿忘我', flowerType: '勿忘我', quantity: 8 },
+    ],
+  },
+];
+
 const calculateStatus = (currentStock: number, safeStock: number): FlowerStatus => {
   if (currentStock === 0) return '缺货';
   if (currentStock < safeStock) return '偏低';
@@ -146,6 +240,8 @@ export const useFlowerStore = create<FlowerStore>()(
       records: initialRecords,
       outboundRecords: initialOutboundRecords,
       flowerTypes: FLOWER_TYPES,
+      packageTemplates: initialPackageTemplates,
+      packageUsageRecords: initialPackageUsageRecords,
 
       calculateStatus,
 
@@ -364,6 +460,189 @@ export const useFlowerStore = create<FlowerStore>()(
             return true;
           })
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      },
+
+      addPackageTemplate: (pkgData) => {
+        const now = new Date().toISOString();
+        const newPkg: PackageTemplate = {
+          ...pkgData,
+          id: `PKG${Date.now().toString().slice(-6)}`,
+          flowers: pkgData.flowers.map(f => {
+            const flower = get().flowers.find(fl => fl.id === f.flowerId);
+            return { ...f, flowerName: flower?.name };
+          }),
+          createdAt: now,
+          updatedAt: now,
+        };
+        set((state) => ({
+          packageTemplates: [...state.packageTemplates, newPkg],
+        }));
+        return newPkg;
+      },
+
+      updatePackageTemplate: (id, pkgData) => {
+        set((state) => {
+          const updatedTemplates = state.packageTemplates.map((pkg) => {
+            if (pkg.id === id) {
+              const flowers = pkgData.flowers
+                ? pkgData.flowers.map(f => {
+                    const flower = state.flowers.find(fl => fl.id === f.flowerId);
+                    return { ...f, flowerName: flower?.name };
+                  })
+                : pkg.flowers;
+              return {
+                ...pkg,
+                ...pkgData,
+                flowers,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return pkg;
+          });
+          return { packageTemplates: updatedTemplates };
+        });
+      },
+
+      deletePackageTemplate: (id) => {
+        set((state) => ({
+          packageTemplates: state.packageTemplates.filter((pkg) => pkg.id !== id),
+          packageUsageRecords: state.packageUsageRecords.filter((r) => r.packageId !== id),
+        }));
+      },
+
+      getPackageTemplates: () => {
+        return get().packageTemplates.sort((a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      },
+
+      getFilteredPackageTemplates: (filters: Partial<PackageFilters>) => {
+        const { type, dateFrom, dateTo, createdBy } = filters;
+        return get().packageTemplates
+          .filter((pkg) => {
+            if (type && type !== 'all' && pkg.type !== type) return false;
+            if ((dateFrom || dateTo) && !isDateInRange(pkg.createdAt.slice(0, 10), dateFrom || '', dateTo || '')) return false;
+            if (createdBy && !pkg.createdBy.includes(createdBy.trim())) return false;
+            return true;
+          })
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      },
+
+      createPackageUsage: (data) => {
+        const state = get();
+        const pkg = state.packageTemplates.find((p) => p.id === data.packageId);
+        if (!pkg) return null;
+
+        for (const item of pkg.flowers) {
+          const flower = state.flowers.find((f) => f.id === item.flowerId);
+          if (!flower || flower.currentStock < item.quantity) {
+            return null;
+          }
+        }
+
+        const now = new Date().toISOString();
+        const usageItems = pkg.flowers.map((item) => {
+          const flower = state.flowers.find((f) => f.id === item.flowerId);
+          return {
+            flowerId: item.flowerId,
+            flowerName: flower?.name,
+            flowerType: flower?.type,
+            quantity: item.quantity,
+          };
+        });
+
+        const newUsageRecord: PackageUsageRecord = {
+          id: generateId(),
+          packageId: pkg.id,
+          packageName: pkg.name,
+          packageType: pkg.type,
+          date: data.date,
+          recipient: data.recipient,
+          usage: data.usage,
+          createdBy: data.createdBy,
+          remark: data.remark,
+          createdAt: now,
+          items: usageItems,
+        };
+
+        const updatedFlowers = state.flowers.map((flower) => {
+          const pkgItem = pkg.flowers.find((i) => i.flowerId === flower.id);
+          if (!pkgItem) return flower;
+          const newStock = flower.currentStock - pkgItem.quantity;
+          return {
+            ...flower,
+            currentStock: newStock,
+            status: calculateStatus(newStock, flower.safeStock),
+            updatedAt: now,
+          };
+        });
+
+        const newOutboundRecords = pkg.flowers.map((item) => {
+          const flower = state.flowers.find((f) => f.id === item.flowerId);
+          return {
+            id: generateId(),
+            flowerId: item.flowerId,
+            flowerName: flower?.name,
+            flowerType: flower?.type,
+            quantity: item.quantity,
+            date: data.date,
+            recipient: data.recipient,
+            usage: data.usage as UsageType,
+            remark: `${pkg.name} · ${data.remark || '套餐领用'}`,
+            createdAt: now,
+          } as OutboundRecord;
+        });
+
+        set((state) => ({
+          flowers: updatedFlowers,
+          outboundRecords: [...newOutboundRecords, ...state.outboundRecords],
+          packageUsageRecords: [newUsageRecord, ...state.packageUsageRecords],
+        }));
+
+        return newUsageRecord;
+      },
+
+      getPackageUsageRecords: (packageId) => {
+        return get().packageUsageRecords
+          .filter((r) => r.packageId === packageId)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      },
+
+      getFilteredPackageUsageRecords: (filters: Partial<PackageUsageFilters>) => {
+        const { packageType, dateFrom, dateTo, createdBy } = filters;
+        return get().packageUsageRecords
+          .filter((r) => {
+            if (packageType && packageType !== 'all' && r.packageType !== packageType) return false;
+            if ((dateFrom || dateTo) && !isDateInRange(r.date, dateFrom || '', dateTo || '')) return false;
+            if (createdBy && !r.createdBy.includes(createdBy.trim())) return false;
+            return true;
+          })
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      },
+
+      getPopularPackages: (limit = 5) => {
+        const records = get().packageUsageRecords;
+        const pkgMap = new Map<string, { packageId: string; packageName: string; count: number; totalQuantity: number }>();
+
+        for (const record of records) {
+          const existing = pkgMap.get(record.packageId);
+          const qty = record.items.reduce((sum, i) => sum + i.quantity, 0);
+          if (existing) {
+            existing.count += 1;
+            existing.totalQuantity += qty;
+          } else {
+            pkgMap.set(record.packageId, {
+              packageId: record.packageId,
+              packageName: record.packageName || '未知套餐',
+              count: 1,
+              totalQuantity: qty,
+            });
+          }
+        }
+
+        return Array.from(pkgMap.values())
+          .sort((a, b) => b.count - a.count)
+          .slice(0, limit);
       },
     }),
     {

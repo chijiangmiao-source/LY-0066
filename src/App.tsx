@@ -1,22 +1,26 @@
 import { useState } from 'preact/hooks';
-import { Flower2, Plus, Package, AlertTriangle, TrendingUp, TrendingDown, ClipboardCheck, ArrowUpDown, XCircle, AlertCircle, LayoutGrid, LogOut, BarChart3, Users, CalendarDays } from 'lucide-preact';
-import type { Flower, RecordType, FlowerStatus } from '@/types';
+import { Flower2, Plus, Package, AlertTriangle, TrendingUp, TrendingDown, ClipboardCheck, ArrowUpDown, XCircle, AlertCircle, LayoutGrid, LogOut, BarChart3, Users, CalendarDays, Gift, Sparkles, Boxes, Layers } from 'lucide-preact';
+import type { Flower, RecordType, FlowerStatus, PackageTemplate } from '@/types';
 import { useFlowerStore } from '@/store/useFlowerStore';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/StatCard';
-import { StatusDistributionChart, RecordTrendChart, OutboundTrendChart, UsageDistributionChart } from '@/components/Charts';
+import { StatusDistributionChart, RecordTrendChart, OutboundTrendChart, UsageDistributionChart, PopularPackageChart, PackageUsageTrendChart, PackageTypeDistributionChart } from '@/components/Charts';
 import { FlowerList } from '@/components/FlowerList';
 import { FlowerForm } from '@/components/FlowerForm';
 import { RecordForm } from '@/components/RecordForm';
 import { StocktakeForm } from '@/components/StocktakeForm';
 import { OutboundForm } from '@/components/OutboundForm';
 import { OutboundList } from '@/components/OutboundList';
+import { PackageForm } from '@/components/PackageForm';
+import { PackageUsageForm } from '@/components/PackageUsageForm';
+import { PackageList } from '@/components/PackageList';
+import { PackageDetail } from '@/components/PackageDetail';
 import { cn, getTodayDateString } from '@/utils/helpers';
 
-type ActiveView = 'inventory' | 'outbound';
+type ActiveView = 'inventory' | 'outbound' | 'package';
 
 export function App() {
-  const { flowers, records, outboundRecords } = useFlowerStore();
+  const { flowers, records, outboundRecords, packageTemplates, packageUsageRecords, getPopularPackages } = useFlowerStore();
 
   const [flowerFormOpen, setFlowerFormOpen] = useState(false);
   const [editFlower, setEditFlower] = useState<Flower | null>(null);
@@ -30,6 +34,15 @@ export function App() {
 
   const [outboundFormOpen, setOutboundFormOpen] = useState(false);
   const [outboundFlower, setOutboundFlower] = useState<Flower | null>(null);
+
+  const [packageFormOpen, setPackageFormOpen] = useState(false);
+  const [editPackage, setEditPackage] = useState<PackageTemplate | null>(null);
+
+  const [packageUsageFormOpen, setPackageUsageFormOpen] = useState(false);
+  const [selectedPackageForUsage, setSelectedPackageForUsage] = useState<PackageTemplate | null>(null);
+
+  const [packageDetailOpen, setPackageDetailOpen] = useState(false);
+  const [viewPackage, setViewPackage] = useState<PackageTemplate | null>(null);
 
   const [quickFilter, setQuickFilter] = useState<'all' | 'low' | 'out'>('all');
   const [activeView, setActiveView] = useState<ActiveView>('inventory');
@@ -45,6 +58,15 @@ export function App() {
   const totalOutbound = outboundRecords.reduce((sum, r) => sum + r.quantity, 0);
   const todayOutbound = outboundRecords.filter(r => r.date === getTodayDateString()).reduce((sum, r) => sum + r.quantity, 0);
   const recipientCount = outboundRecords.length;
+
+  const totalPackages = packageTemplates.length;
+  const totalPackageUsage = packageUsageRecords.length;
+  const todayPackageUsage = packageUsageRecords.filter(r => r.date === getTodayDateString()).length;
+  const totalPackageFlowers = packageUsageRecords.reduce(
+    (sum, r) => sum + r.items.reduce((s, i) => s + i.quantity, 0),
+    0
+  );
+  const popularPackages = getPopularPackages(5);
 
   const handleEditFlower = (flower: Flower) => {
     setEditFlower(flower);
@@ -78,6 +100,26 @@ export function App() {
 
   const handleFilterChange = (_filters: { status: FlowerStatus | 'all'; type: string; location: string }) => {
     setQuickFilter('all');
+  };
+
+  const handleAddPackage = () => {
+    setEditPackage(null);
+    setPackageFormOpen(true);
+  };
+
+  const handleEditPackage = (pkg: PackageTemplate) => {
+    setEditPackage(pkg);
+    setPackageFormOpen(true);
+  };
+
+  const handleViewPackage = (pkg: PackageTemplate) => {
+    setViewPackage(pkg);
+    setPackageDetailOpen(true);
+  };
+
+  const handleUsePackage = (pkg?: PackageTemplate) => {
+    setSelectedPackageForUsage(pkg || null);
+    setPackageUsageFormOpen(true);
   };
 
   return (
@@ -117,6 +159,17 @@ export function App() {
                 >
                   <LogOut className="h-4 w-4 mr-1" />
                   出库管理
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveView('package')}
+                  className={cn(
+                    activeView === 'package' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  )}
+                >
+                  <Gift className="h-4 w-4 mr-1" />
+                  套餐管理
                 </Button>
               </div>
               {activeView === 'inventory' ? (
@@ -193,7 +246,7 @@ export function App() {
                     新增鲜花
                   </Button>
                 </div>
-              ) : (
+              ) : activeView === 'outbound' ? (
                 <div className="flex items-center gap-2">
                   <Button
                     onClick={() => handleOutbound()}
@@ -201,6 +254,24 @@ export function App() {
                   >
                     <LogOut className="h-4 w-4 mr-1" />
                     登记出库
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleUsePackage()}
+                    className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300"
+                  >
+                    <LogOut className="h-4 w-4 mr-1" />
+                    套餐领用
+                  </Button>
+                  <Button
+                    onClick={handleAddPackage}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    新增套餐
                   </Button>
                 </div>
               )}
@@ -271,7 +342,7 @@ export function App() {
               onFilterChange={handleFilterChange}
             />
           </>
-        ) : (
+        ) : activeView === 'outbound' ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard
@@ -313,6 +384,57 @@ export function App() {
 
             <OutboundList onRecordOutbound={handleOutbound} />
           </>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard
+                title="套餐模板"
+                value={`${totalPackages} 个`}
+                icon={<Layers className="h-5 w-5" />}
+                color="indigo"
+              />
+              <StatCard
+                title="累计领用"
+                value={`${totalPackageUsage} 次`}
+                icon={<Gift className="h-5 w-5" />}
+                color="purple"
+              />
+              <StatCard
+                title="今日领用"
+                value={`${todayPackageUsage} 次`}
+                icon={<CalendarDays className="h-5 w-5" />}
+                color="blue"
+              />
+              <StatCard
+                title="领用鲜花"
+                value={`${totalPackageFlowers} 枝`}
+                icon={<Sparkles className="h-5 w-5" />}
+                color="green"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">套餐类型分布</h3>
+                <PackageTypeDistributionChart records={packageUsageRecords} width={260} height={200} />
+              </div>
+              <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">热门套餐排行</h3>
+                <PopularPackageChart popularPackages={popularPackages} width={280} height={220} />
+              </div>
+              <div className="lg:col-span-1 bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">套餐使用趋势</h3>
+                <PackageUsageTrendChart records={packageUsageRecords} width={280} height={220} />
+              </div>
+            </div>
+
+            <PackageList
+              onAdd={handleAddPackage}
+              onEdit={handleEditPackage}
+              onView={handleViewPackage}
+              onUse={handleUsePackage}
+            />
+          </>
         )}
       </main>
 
@@ -347,6 +469,32 @@ export function App() {
         open={outboundFormOpen}
         onOpenChange={setOutboundFormOpen}
         selectedFlower={outboundFlower}
+      />
+
+      <PackageForm
+        open={packageFormOpen}
+        onOpenChange={setPackageFormOpen}
+        editPackage={editPackage}
+      />
+
+      <PackageUsageForm
+        open={packageUsageFormOpen}
+        onOpenChange={setPackageUsageFormOpen}
+        selectedPackage={selectedPackageForUsage}
+      />
+
+      <PackageDetail
+        open={packageDetailOpen}
+        onOpenChange={setPackageDetailOpen}
+        pkg={viewPackage}
+        onEdit={() => {
+          setPackageDetailOpen(false);
+          if (viewPackage) handleEditPackage(viewPackage);
+        }}
+        onUse={() => {
+          setPackageDetailOpen(false);
+          if (viewPackage) handleUsePackage(viewPackage);
+        }}
       />
     </div>
   );

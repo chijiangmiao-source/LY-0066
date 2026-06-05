@@ -1,4 +1,4 @@
-import type { FlowerStatus, RecordType, UsageType } from '@/types';
+import type { FlowerStatus, RecordType, UsageType, PackageType } from '@/types';
 
 export const FLOWER_TYPES = [
   '白菊',
@@ -23,6 +23,15 @@ export const USAGE_TYPES: UsageType[] = [
   '守灵',
   '骨灰安放',
   '日常祭扫',
+  '其他',
+];
+
+export const PACKAGE_TYPES: PackageType[] = [
+  '告别仪式花篮',
+  '追思会花束',
+  '守灵花圈',
+  '骨灰安放花束',
+  '日常祭扫套餐',
   '其他',
 ];
 
@@ -67,5 +76,23 @@ export const USAGE_TYPE_CHART_COLORS: Record<UsageType, string> = {
 
 export const OUTBOUND_COLOR = 'bg-violet-50 border-violet-500';
 export const OUTBOUND_TEXT_COLOR = 'text-violet-700';
+
+export const PACKAGE_TYPE_COLORS: Record<PackageType, string> = {
+  '告别仪式花篮': 'bg-indigo-100 text-indigo-800',
+  '追思会花束': 'bg-purple-100 text-purple-800',
+  '守灵花圈': 'bg-slate-100 text-slate-800',
+  '骨灰安放花束': 'bg-teal-100 text-teal-800',
+  '日常祭扫套餐': 'bg-amber-100 text-amber-800',
+  '其他': 'bg-gray-100 text-gray-800',
+};
+
+export const PACKAGE_TYPE_CHART_COLORS: Record<PackageType, string> = {
+  '告别仪式花篮': '#6366f1',
+  '追思会花束': '#8b5cf6',
+  '守灵花圈': '#64748b',
+  '骨灰安放花束': '#14b8a6',
+  '日常祭扫套餐': '#f59e0b',
+  '其他': '#9ca3af',
+};
 
 export const STORAGE_KEY = 'flower-inventory-storage';

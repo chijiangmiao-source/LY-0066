@@ -8,7 +8,7 @@ interface StatCardProps {
     value: number;
     label: string;
   };
-  color?: 'green' | 'blue' | 'yellow' | 'red' | 'purple';
+  color?: 'green' | 'blue' | 'yellow' | 'red' | 'purple' | 'indigo';
   className?: string;
 }
 
@@ -18,6 +18,7 @@ const colorStyles: Record<string, string> = {
   yellow: 'bg-yellow-50 text-yellow-600',
   red: 'bg-red-50 text-red-600',
   purple: 'bg-purple-50 text-purple-600',
+  indigo: 'bg-indigo-50 text-indigo-600',
 };
 
 export function StatCard({ title, value, icon, trend, color = 'green', className }: StatCardProps) {
