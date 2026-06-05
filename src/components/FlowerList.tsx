@@ -1,29 +1,80 @@
 import { useState } from 'preact/hooks';
-import { Search, Edit2, Eye, Trash2, Plus } from 'lucide-preact';
-import type { Flower, RecordType } from '@/types';
-import { STATUS_COLORS } from '@/utils/constants';
+import { Search, Edit2, Eye, Trash2, Plus, ClipboardCheck, Filter, X } from 'lucide-preact';
+import type { Flower, RecordType, FlowerStatus } from '@/types';
+import { STATUS_COLORS, FLOWER_STATUSES } from '@/utils/constants';
 import { cn } from '@/utils/helpers';
 import { useFlowerStore } from '@/store/useFlowerStore';
 import { Button } from '@/components/ui/Button';
 import { Drawer } from '@/components/ui/Drawer';
+import { Select, SelectItem } from '@/components/ui/Select';
 import { FlowerDetail } from '@/components/FlowerDetail';
 
 interface FlowerListProps {
   onEdit: (flower: Flower) => void;
   onRecord: (type: RecordType, flower: Flower) => void;
+  onStocktake: (flower: Flower) => void;
+  filterStatus?: FlowerStatus | 'all';
+  filterType?: string;
+  filterLocation?: string;
+  onFilterChange?: (filters: { status: FlowerStatus | 'all'; type: string; location: string }) => void;
+  quickFilter?: 'all' | 'low' | 'out';
 }
 
-export function FlowerList({ onEdit, onRecord }: FlowerListProps) {
-  const { flowers } = useFlowerStore();
+export function FlowerList({
+  onEdit,
+  onRecord,
+  onStocktake,
+  filterStatus = 'all',
+  filterType = 'all',
+  filterLocation = 'all',
+  onFilterChange,
+  quickFilter = 'all',
+}: FlowerListProps) {
+  const { flowers, flowerTypes } = useFlowerStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFlower, setSelectedFlower] = useState<Flower | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const filteredFlowers = flowers.filter(flower =>
-    flower.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    flower.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    flower.type.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const [localStatus, setLocalStatus] = useState<FlowerStatus | 'all'>(filterStatus);
+  const [localType, setLocalType] = useState<string>(filterType);
+  const [localLocation, setLocalLocation] = useState<string>(filterLocation);
+
+  const allLocations = Array.from(new Set(flowers.map(f => f.location).filter(Boolean)));
+  const allTypes = flowerTypes?.length ? flowerTypes : [];
+
+  const filteredFlowers = flowers.filter(flower => {
+    const matchesSearch =
+      flower.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      flower.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      flower.type.toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchesStatus = true;
+    if (quickFilter === 'low') {
+      matchesStatus = flower.status === '偏低';
+    } else if (quickFilter === 'out') {
+      matchesStatus = flower.status === '缺货';
+    } else if (localStatus !== 'all') {
+      matchesStatus = flower.status === localStatus;
+    }
+
+    const matchesType = localType === 'all' || flower.type === localType;
+    const matchesLocation = localLocation === 'all' || flower.location === localLocation;
+
+    return matchesSearch && matchesStatus && matchesType && matchesLocation;
+  });
+
+  const emitFilterChange = (status: FlowerStatus | 'all', type: string, location: string) => {
+    setLocalStatus(status);
+    setLocalType(type);
+    setLocalLocation(location);
+    onFilterChange?.({ status, type, location });
+  };
+
+  const resetFilters = () => {
+    emitFilterChange('all', 'all', 'all');
+  };
+
+  const hasActiveFilters = localStatus !== 'all' || localType !== 'all' || localLocation !== 'all' || quickFilter !== 'all';
 
   const handleViewDetail = (flower: Flower) => {
     setSelectedFlower(flower);
@@ -33,7 +84,7 @@ export function FlowerList({ onEdit, onRecord }: FlowerListProps) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100">
       <div className="p-4 border-b border-gray-100">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">鲜花库存</h2>
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
@@ -48,6 +99,76 @@ export function FlowerList({ onEdit, onRecord }: FlowerListProps) {
             </div>
           </div>
         </div>
+
+        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+          <div className="flex items-center gap-2 text-sm text-gray-500 lg:w-20 shrink-0">
+            <Filter className="h-4 w-4" />
+            筛选:
+          </div>
+          <div className="flex flex-wrap gap-3 flex-1">
+            <div className="w-40">
+              <Select
+                value={localStatus}
+                onValueChange={(value) => emitFilterChange(value as FlowerStatus | 'all', localType, localLocation)}
+              >
+                <SelectItem value="all">全部状态</SelectItem>
+                {FLOWER_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+            <div className="w-40">
+              <Select
+                value={localType}
+                onValueChange={(value) => emitFilterChange(localStatus, value, localLocation)}
+              >
+                <SelectItem value="all">全部类型</SelectItem>
+                {allTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+            <div className="w-40">
+              <Select
+                value={localLocation}
+                onValueChange={(value) => emitFilterChange(localStatus, localType, value)}
+              >
+                <SelectItem value="all">全部位置</SelectItem>
+                {allLocations.map((loc) => (
+                  <SelectItem key={loc} value={loc}>
+                    {loc}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+          </div>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-4 w-4 mr-1" />
+              重置
+            </Button>
+          )}
+        </div>
+
+        {quickFilter === 'low' && (
+          <div className="mt-3 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+            当前视图：只显示库存偏低的鲜花
+          </div>
+        )}
+        {quickFilter === 'out' && (
+          <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            当前视图：只显示缺货的鲜花
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -149,6 +270,15 @@ export function FlowerList({ onEdit, onRecord }: FlowerListProps) {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => onStocktake(flower)}
+                          title="库存盘点"
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <ClipboardCheck className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => onRecord('补货', flower)}
                           title="补货"
                           className="text-green-600 hover:text-green-700 hover:bg-green-50"
@@ -190,6 +320,10 @@ export function FlowerList({ onEdit, onRecord }: FlowerListProps) {
             onRecord={(type) => {
               setDrawerOpen(false);
               onRecord(type, selectedFlower);
+            }}
+            onStocktake={() => {
+              setDrawerOpen(false);
+              onStocktake(selectedFlower);
             }}
           />
         )}

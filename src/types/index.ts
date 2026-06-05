@@ -1,5 +1,5 @@
 export type FlowerStatus = '正常' | '偏低' | '缺货' | '停用';
-export type RecordType = '补货' | '损耗';
+export type RecordType = '补货' | '损耗' | '盘盈' | '盘亏';
 
 export interface Flower {
   id: string;
@@ -17,11 +17,24 @@ export interface OperationRecord {
   id: string;
   flowerId: string;
   type: RecordType;
+  flowerName?: string;
   quantity: number;
   date: string;
   operator: string;
   remark: string;
   createdAt: string;
+  systemStock?: number;
+  actualStock?: number;
+  diffQuantity?: number;
+}
+
+export interface StocktakeData {
+  flowerId: string;
+  systemStock: number;
+  actualStock: number;
+  operator: string;
+  date: string;
+  remark?: string;
 }
 
 export interface FlowerStore {
@@ -35,4 +48,5 @@ export interface FlowerStore {
   addFlowerType: (type: string) => void;
   getFlowerRecords: (flowerId: string) => OperationRecord[];
   calculateStatus: (currentStock: number, safeStock: number) => FlowerStatus;
+  performStocktake: (data: StocktakeData) => { type: '盘盈' | '盘亏' | null; quantity: number } | null;
 }

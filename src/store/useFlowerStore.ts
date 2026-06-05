@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Flower, OperationRecord, FlowerStatus, FlowerStore } from '@/types';
+import type { Flower, OperationRecord, FlowerStatus, FlowerStore, StocktakeData } from '@/types';
 import { generateId, getTodayDateString } from '@/utils/helpers';
 import { FLOWER_TYPES } from '@/utils/constants';
 
@@ -173,31 +173,35 @@ export const useFlowerStore = create<FlowerStore>()(
       },
 
       addRecord: (recordData) => {
+        const state = get();
+        const flower = state.flowers.find((f) => f.id === recordData.flowerId);
+
         const newRecord: OperationRecord = {
           ...recordData,
+          flowerName: flower?.name,
           id: generateId(),
           createdAt: new Date().toISOString(),
         };
 
         set((state) => {
-          const flower = state.flowers.find((f) => f.id === recordData.flowerId);
-          if (!flower) return { records: [...state.records, newRecord] };
+          const f = state.flowers.find((fl) => fl.id === recordData.flowerId);
+          if (!f) return { records: [...state.records, newRecord] };
 
           const newStock =
-            recordData.type === '补货'
-              ? flower.currentStock + recordData.quantity
-              : flower.currentStock - recordData.quantity;
+            recordData.type === '补货' || recordData.type === '盘盈'
+              ? f.currentStock + recordData.quantity
+              : f.currentStock - recordData.quantity;
 
-          const updatedFlowers = state.flowers.map((f) => {
-            if (f.id === recordData.flowerId) {
+          const updatedFlowers = state.flowers.map((fl) => {
+            if (fl.id === recordData.flowerId) {
               return {
-                ...f,
+                ...fl,
                 currentStock: newStock,
-                status: calculateStatus(newStock, f.safeStock),
+                status: calculateStatus(newStock, fl.safeStock),
                 updatedAt: new Date().toISOString(),
               };
             }
-            return f;
+            return fl;
           });
 
           return {
@@ -211,6 +215,62 @@ export const useFlowerStore = create<FlowerStore>()(
         return get().records.filter((r) => r.flowerId === flowerId).sort((a, b) => 
           new Date(b.date).getTime() - new Date(a.date).getTime()
         );
+      },
+
+      performStocktake: (data: StocktakeData) => {
+        const { flowerId, systemStock, actualStock, operator, date, remark } = data;
+        const diff = actualStock - systemStock;
+
+        if (diff === 0) {
+          return { type: null, quantity: 0 };
+        }
+
+        const type: '盘盈' | '盘亏' = diff > 0 ? '盘盈' : '盘亏';
+        const quantity = Math.abs(diff);
+
+        const state = get();
+        const flower = state.flowers.find((f) => f.id === flowerId);
+
+        const stocktakeRecord: OperationRecord = {
+          id: generateId(),
+          flowerId,
+          flowerName: flower?.name,
+          type,
+          quantity,
+          date,
+          operator,
+          remark: remark || '',
+          createdAt: new Date().toISOString(),
+          systemStock,
+          actualStock,
+          diffQuantity: diff,
+        };
+
+        set((state) => {
+          const f = state.flowers.find((fl) => fl.id === flowerId);
+          if (!f) return { records: [...state.records, stocktakeRecord] };
+
+          const newStock = actualStock;
+
+          const updatedFlowers = state.flowers.map((fl) => {
+            if (fl.id === flowerId) {
+              return {
+                ...fl,
+                currentStock: newStock,
+                status: calculateStatus(newStock, fl.safeStock),
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return fl;
+          });
+
+          return {
+            records: [...state.records, stocktakeRecord],
+            flowers: updatedFlowers,
+          };
+        });
+
+        return { type, quantity };
       },
     }),
     {

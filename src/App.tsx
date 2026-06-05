@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
-import { Flower2, Plus, Package, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-preact';
-import type { Flower, RecordType } from '@/types';
+import { Flower2, Plus, Package, AlertTriangle, TrendingUp, TrendingDown, ClipboardCheck, ArrowUpDown, XCircle, AlertCircle, LayoutGrid } from 'lucide-preact';
+import type { Flower, RecordType, FlowerStatus } from '@/types';
 import { useFlowerStore } from '@/store/useFlowerStore';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/StatCard';
@@ -8,21 +8,31 @@ import { StatusDistributionChart, RecordTrendChart } from '@/components/Charts';
 import { FlowerList } from '@/components/FlowerList';
 import { FlowerForm } from '@/components/FlowerForm';
 import { RecordForm } from '@/components/RecordForm';
+import { StocktakeForm } from '@/components/StocktakeForm';
+import { cn } from '@/utils/helpers';
 
 export function App() {
   const { flowers, records } = useFlowerStore();
-  
+
   const [flowerFormOpen, setFlowerFormOpen] = useState(false);
   const [editFlower, setEditFlower] = useState<Flower | null>(null);
-  
+
   const [recordFormOpen, setRecordFormOpen] = useState(false);
   const [recordType, setRecordType] = useState<RecordType>('补货');
   const [selectedFlower, setSelectedFlower] = useState<Flower | null>(null);
 
+  const [stocktakeFormOpen, setStocktakeFormOpen] = useState(false);
+  const [stocktakeFlower, setStocktakeFlower] = useState<Flower | null>(null);
+
+  const [quickFilter, setQuickFilter] = useState<'all' | 'low' | 'out'>('all');
+
   const totalStock = flowers.reduce((sum, f) => sum + f.currentStock, 0);
-  const lowStockCount = flowers.filter(f => f.status === '偏低' || f.status === '缺货').length;
+  const lowStockCount = flowers.filter(f => f.status === '偏低').length;
+  const outOfStockCount = flowers.filter(f => f.status === '缺货').length;
   const totalReplenish = records.filter(r => r.type === '补货').reduce((sum, r) => sum + r.quantity, 0);
   const totalWaste = records.filter(r => r.type === '损耗').reduce((sum, r) => sum + r.quantity, 0);
+  const totalSurplus = records.filter(r => r.type === '盘盈').reduce((sum, r) => sum + r.quantity, 0);
+  const totalShortage = records.filter(r => r.type === '盘亏').reduce((sum, r) => sum + r.quantity, 0);
 
   const handleEditFlower = (flower: Flower) => {
     setEditFlower(flower);
@@ -40,6 +50,19 @@ export function App() {
     setRecordFormOpen(true);
   };
 
+  const handleStocktake = (flower?: Flower) => {
+    setStocktakeFlower(flower || null);
+    setStocktakeFormOpen(true);
+  };
+
+  const handleQuickFilter = (filter: 'all' | 'low' | 'out') => {
+    setQuickFilter(filter);
+  };
+
+  const handleFilterChange = (_filters: { status: FlowerStatus | 'all'; type: string; location: string }) => {
+    setQuickFilter('all');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
@@ -54,7 +77,43 @@ export function App() {
                 <p className="text-xs text-gray-500">殡葬服务机构鲜花库存系统</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickFilter('out')}
+                className={cn(
+                  'border-red-200',
+                  quickFilter === 'out' ? 'bg-red-50 text-red-700 border-red-300' : 'text-red-600 hover:bg-red-50'
+                )}
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                缺货 ({outOfStockCount})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickFilter('low')}
+                className={cn(
+                  'border-yellow-200',
+                  quickFilter === 'low' ? 'bg-yellow-50 text-yellow-700 border-yellow-300' : 'text-yellow-600 hover:bg-yellow-50'
+                )}
+              >
+                <AlertCircle className="h-4 w-4 mr-1" />
+                偏低 ({lowStockCount})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickFilter('all')}
+                className={cn(
+                  quickFilter === 'all' ? 'bg-gray-100 text-gray-700' : ''
+                )}
+              >
+                <LayoutGrid className="h-4 w-4 mr-1" />
+                全部
+              </Button>
+              <div className="w-px h-6 bg-gray-200 mx-1 hidden sm:block" />
               <Button
                 variant="outline"
                 onClick={() => handleRecord('损耗')}
@@ -70,6 +129,14 @@ export function App() {
                 <TrendingUp className="h-4 w-4 mr-1" />
                 补货登记
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleStocktake()}
+                className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
+              >
+                <ClipboardCheck className="h-4 w-4 mr-1" />
+                库存盘点
+              </Button>
               <Button onClick={handleAddFlower}>
                 <Plus className="h-4 w-4 mr-1" />
                 新增鲜花
@@ -80,7 +147,7 @@ export function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
           <StatCard
             title="库存总量"
             value={`${totalStock} 枝`}
@@ -88,10 +155,16 @@ export function App() {
             color="green"
           />
           <StatCard
-            title="库存预警"
+            title="库存偏低"
             value={`${lowStockCount} 种`}
-            icon={<AlertTriangle className="h-5 w-5" />}
+            icon={<AlertCircle className="h-5 w-5" />}
             color={lowStockCount > 0 ? 'yellow' : 'green'}
+          />
+          <StatCard
+            title="缺货品种"
+            value={`${outOfStockCount} 种`}
+            icon={<XCircle className="h-5 w-5" />}
+            color={outOfStockCount > 0 ? 'red' : 'green'}
           />
           <StatCard
             title="累计补货"
@@ -104,6 +177,12 @@ export function App() {
             value={`${totalWaste} 枝`}
             icon={<TrendingDown className="h-5 w-5" />}
             color="red"
+          />
+          <StatCard
+            title="盘盈/盘亏"
+            value={`+${totalSurplus} / -${totalShortage}`}
+            icon={<ArrowUpDown className="h-5 w-5" />}
+            color={totalShortage > totalSurplus ? 'yellow' : 'purple'}
           />
         </div>
 
@@ -121,6 +200,9 @@ export function App() {
         <FlowerList
           onEdit={handleEditFlower}
           onRecord={handleRecord}
+          onStocktake={handleStocktake}
+          quickFilter={quickFilter}
+          onFilterChange={handleFilterChange}
         />
       </main>
 
@@ -143,6 +225,12 @@ export function App() {
         onOpenChange={setRecordFormOpen}
         type={recordType}
         selectedFlower={selectedFlower}
+      />
+
+      <StocktakeForm
+        open={stocktakeFormOpen}
+        onOpenChange={setStocktakeFormOpen}
+        selectedFlower={stocktakeFlower}
       />
     </div>
   );
