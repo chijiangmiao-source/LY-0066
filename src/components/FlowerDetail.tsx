@@ -129,7 +129,7 @@ export function FlowerDetail({ flower, onEdit, onRecord }: FlowerDetailProps) {
                     'font-medium text-sm',
                     record.type === '补货' ? 'text-green-700' : 'text-red-700'
                   )}>
-                    {record.type} +{record.quantity} 枝
+                    {record.type} {record.type === '补货' ? '+' : '-'}{record.quantity} 枝
                   </span>
                   <span className="text-xs text-gray-500 flex items-center gap-1">
                     <Calendar className="h-3 w-3" />

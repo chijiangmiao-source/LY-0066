@@ -27,10 +27,12 @@ export interface OperationRecord {
 export interface FlowerStore {
   flowers: Flower[];
   records: OperationRecord[];
+  flowerTypes: string[];
   addFlower: (flower: Flower) => void;
   updateFlower: (id: string, flower: Partial<Flower>) => void;
   deleteFlower: (id: string) => void;
   addRecord: (record: Omit<OperationRecord, 'id' | 'createdAt'>) => void;
+  addFlowerType: (type: string) => void;
   getFlowerRecords: (flowerId: string) => OperationRecord[];
   calculateStatus: (currentStock: number, safeStock: number) => FlowerStatus;
 }

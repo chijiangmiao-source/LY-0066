@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Flower, OperationRecord, FlowerStatus, FlowerStore } from '@/types';
 import { generateId, getTodayDateString } from '@/utils/helpers';
+import { FLOWER_TYPES } from '@/utils/constants';
 
 const initialFlowers: Flower[] = [
   {
@@ -116,8 +117,15 @@ export const useFlowerStore = create<FlowerStore>()(
     (set, get) => ({
       flowers: initialFlowers,
       records: initialRecords,
+      flowerTypes: FLOWER_TYPES,
 
       calculateStatus,
+
+      addFlowerType: (type) => {
+        set((state) => ({
+          flowerTypes: state.flowerTypes.includes(type) ? state.flowerTypes : [...state.flowerTypes, type],
+        }));
+      },
 
       addFlower: (flowerData) => {
         set((state) => ({
@@ -126,8 +134,9 @@ export const useFlowerStore = create<FlowerStore>()(
       },
 
       updateFlower: (id, flowerData) => {
-        set((state) => ({
-          flowers: state.flowers.map((flower) => {
+        set((state) => {
+          const newId = flowerData.id ?? id;
+          const updatedFlowers = state.flowers.map((flower) => {
             if (flower.id === id) {
               const currentStock = flowerData.currentStock ?? flower.currentStock;
               const safeStock = flowerData.safeStock ?? flower.safeStock;
@@ -135,13 +144,25 @@ export const useFlowerStore = create<FlowerStore>()(
               return {
                 ...flower,
                 ...flowerData,
+                id: newId,
                 status,
                 updatedAt: new Date().toISOString(),
               };
             }
             return flower;
-          }),
-        }));
+          });
+
+          const updatedRecords = newId !== id
+            ? state.records.map((record) =>
+                record.flowerId === id ? { ...record, flowerId: newId } : record
+              )
+            : state.records;
+
+          return {
+            flowers: updatedFlowers,
+            records: updatedRecords,
+          };
+        });
       },
 
       deleteFlower: (id) => {

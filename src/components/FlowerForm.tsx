@@ -1,17 +1,18 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import type { Flower } from '@/types';
 import { FLOWER_TYPES, FLOWER_STATUSES } from '@/utils/constants';
 import { useFlowerStore } from '@/store/useFlowerStore';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select, SelectItem } from '@/components/ui/Select';
+import { Dialog } from '@/components/ui/Dialog';
+import { Plus } from 'lucide-preact';
 
 const calculateStatus = (currentStock: number, safeStock: number): '正常' | '偏低' | '缺货' | '停用' => {
   if (currentStock === 0) return '缺货';
   if (currentStock < safeStock) return '偏低';
   return '正常';
 };
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select, SelectItem } from '@/components/ui/Select';
-import { Dialog } from '@/components/ui/Dialog';
 
 interface FlowerFormProps {
   open: boolean;
@@ -22,25 +23,52 @@ interface FlowerFormProps {
 interface FormErrors {
   id?: string;
   name?: string;
+  type?: string;
   currentStock?: string;
   safeStock?: string;
 }
 
+const defaultFormData = {
+  id: '',
+  name: '',
+  type: FLOWER_TYPES[0],
+  currentStock: '0',
+  safeStock: '10',
+  location: '',
+  status: '正常' as '正常' | '偏低' | '缺货' | '停用',
+};
+
 export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) {
-  const { flowers, addFlower, updateFlower } = useFlowerStore();
+  const { flowers, addFlower, updateFlower, flowerTypes, addFlowerType } = useFlowerStore();
   const isEdit = !!editFlower;
 
-  const [formData, setFormData] = useState({
-    id: editFlower?.id || '',
-    name: editFlower?.name || '',
-    type: editFlower?.type || FLOWER_TYPES[0],
-    currentStock: editFlower?.currentStock?.toString() || '0',
-    safeStock: editFlower?.safeStock?.toString() || '10',
-    location: editFlower?.location || '',
-    status: editFlower?.status || '正常',
-  });
+  const [formData, setFormData] = useState(defaultFormData);
+  const [showNewTypeInput, setShowNewTypeInput] = useState(false);
+  const [newTypeValue, setNewTypeValue] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      if (editFlower) {
+        setFormData({
+          id: editFlower.id,
+          name: editFlower.name,
+          type: editFlower.type,
+          currentStock: editFlower.currentStock.toString(),
+          safeStock: editFlower.safeStock.toString(),
+          location: editFlower.location,
+          status: editFlower.status,
+        });
+      } else {
+        setFormData(defaultFormData);
+      }
+      setShowNewTypeInput(false);
+      setNewTypeValue('');
+    }
+  }, [open, editFlower]);
 
   const [errors, setErrors] = useState<FormErrors>({});
+
+  const allFlowerTypes = flowerTypes?.length ? flowerTypes : FLOWER_TYPES;
 
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
@@ -49,10 +77,16 @@ export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) 
       newErrors.id = '鲜花编号不能为空';
     } else if (!isEdit && flowers.some(f => f.id === formData.id)) {
       newErrors.id = '鲜花编号已存在';
+    } else if (isEdit && editFlower && formData.id !== editFlower.id && flowers.some(f => f.id === formData.id)) {
+      newErrors.id = '鲜花编号已存在';
     }
 
     if (!formData.name.trim()) {
       newErrors.name = '鲜花名称不能为空';
+    }
+
+    if (!formData.type.trim()) {
+      newErrors.type = '鲜花类型不能为空';
     }
 
     const currentStock = parseInt(formData.currentStock);
@@ -69,6 +103,17 @@ export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) 
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleAddNewType = () => {
+    const trimmed = newTypeValue.trim();
+    if (!trimmed) return;
+    if (!allFlowerTypes.includes(trimmed)) {
+      addFlowerType(trimmed);
+    }
+    setFormData({ ...formData, type: trimmed });
+    setShowNewTypeInput(false);
+    setNewTypeValue('');
+  };
+
   const handleSubmit = (e: Event) => {
     e.preventDefault();
     if (!validate()) return;
@@ -82,7 +127,10 @@ export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) 
     };
 
     if (isEdit && editFlower) {
-      updateFlower(editFlower.id, {
+      const oldId = editFlower.id;
+      const newId = formData.id.trim();
+      updateFlower(oldId, {
+        id: newId,
         ...flowerData,
         status: formData.status as '正常' | '偏低' | '缺货' | '停用',
       });
@@ -129,7 +177,6 @@ export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) 
             value={formData.id}
             onInput={(e) => setFormData({ ...formData, id: (e.target as HTMLInputElement).value })}
             error={errors.id}
-            disabled={isEdit}
             placeholder="如：FL001"
           />
           <Input
@@ -142,17 +189,63 @@ export function FlowerForm({ open, onOpenChange, editFlower }: FlowerFormProps) 
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Select
-            label="鲜花类型"
-            value={formData.type}
-            onValueChange={(value) => setFormData({ ...formData, type: value })}
-          >
-            {FLOWER_TYPES.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </Select>
+          <div>
+            {!showNewTypeInput ? (
+              <div>
+                <Select
+                  label="鲜花类型"
+                  value={formData.type}
+                  onValueChange={(value) => {
+                    if (value === '__add_new__') {
+                      setShowNewTypeInput(true);
+                    } else {
+                      setFormData({ ...formData, type: value });
+                    }
+                  }}
+                >
+                  {allFlowerTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__add_new__">
+                    <span className="text-primary-600 flex items-center gap-1">
+                      <Plus className="h-3.5 w-3.5" /> 新增类型
+                    </span>
+                  </SelectItem>
+                </Select>
+                {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type}</p>}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  新增鲜花类型
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newTypeValue}
+                    onInput={(e) => setNewTypeValue((e.target as HTMLInputElement).value)}
+                    placeholder="请输入类型名称"
+                    className="flex-1"
+                  />
+                  <Button type="button" size="sm" onClick={handleAddNewType}>
+                    确定
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowNewTypeInput(false);
+                      setNewTypeValue('');
+                    }}
+                  >
+                    取消
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
           <Input
             label="冷柜位置"
             value={formData.location}
