@@ -44,7 +44,7 @@ export function App() {
 
   const totalOutbound = outboundRecords.reduce((sum, r) => sum + r.quantity, 0);
   const todayOutbound = outboundRecords.filter(r => r.date === getTodayDateString()).reduce((sum, r) => sum + r.quantity, 0);
-  const uniqueRecipients = new Set(outboundRecords.map(r => r.recipient)).size;
+  const recipientCount = outboundRecords.length;
 
   const handleEditFlower = (flower: Flower) => {
     setEditFlower(flower);
@@ -294,7 +294,7 @@ export function App() {
               />
               <StatCard
                 title="领用人次"
-                value={`${uniqueRecipients} 人`}
+                value={`${recipientCount} 次`}
                 icon={<Users className="h-5 w-5" />}
                 color="yellow"
               />

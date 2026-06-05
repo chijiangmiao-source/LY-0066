@@ -59,7 +59,7 @@ export function getLastNWeeks(n: number): { label: string; start: string; end: s
     end.setDate(currentWeekEnd.getDate() - i * 7);
     const start = new Date(end);
     start.setDate(end.getDate() - 6);
-    const weekNum = Math.ceil((end.getDate() + new Date(end.getFullYear(), end.getMonth(), 1).getDay()) / 7);
+    const weekNum = Math.min(5, Math.ceil(end.getDate() / 7));
     weeks.push({
       label: `${end.getMonth() + 1}月第${weekNum}周`,
       start: getDateString(start),

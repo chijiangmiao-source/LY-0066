@@ -16,6 +16,7 @@ import {
   Flower2,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
 } from 'lucide-preact';
 
 interface OutboundListProps {
@@ -34,14 +35,20 @@ export function OutboundList({ onRecordOutbound }: OutboundListProps) {
 
   const [showFilters, setShowFilters] = useState(true);
 
+  const dateRangeInvalid = filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo;
+
+  const hasActiveFilters =
+    filters.usage !== 'all' || filters.dateFrom || filters.dateTo || filters.recipient.trim();
+
   const filteredRecords = useMemo(() => {
-    const hasActiveFilter =
+    if (dateRangeInvalid) return outboundRecords;
+    const filterActive =
       filters.usage !== 'all' ||
       filters.dateFrom !== '' ||
       filters.dateTo !== '' ||
       filters.recipient.trim() !== '';
-    return hasActiveFilter ? getFilteredOutboundRecords(filters) : outboundRecords;
-  }, [filters, outboundRecords, getFilteredOutboundRecords]);
+    return filterActive ? getFilteredOutboundRecords(filters) : outboundRecords;
+  }, [filters, outboundRecords, getFilteredOutboundRecords, dateRangeInvalid]);
 
   const totalQuantity = filteredRecords.reduce((sum, r) => sum + r.quantity, 0);
 
@@ -53,9 +60,6 @@ export function OutboundList({ onRecordOutbound }: OutboundListProps) {
       recipient: '',
     });
   };
-
-  const hasActiveFilters =
-    filters.usage !== 'all' || filters.dateFrom || filters.dateTo || filters.recipient.trim();
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -105,6 +109,7 @@ export function OutboundList({ onRecordOutbound }: OutboundListProps) {
                 label="出库日期(起)"
                 type="date"
                 value={filters.dateFrom}
+                max={filters.dateTo || undefined}
                 onInput={(e) => setFilters({ ...filters, dateFrom: (e.target as HTMLInputElement).value })}
               />
 
@@ -112,6 +117,7 @@ export function OutboundList({ onRecordOutbound }: OutboundListProps) {
                 label="出库日期(止)"
                 type="date"
                 value={filters.dateTo}
+                min={filters.dateFrom || undefined}
                 onInput={(e) => setFilters({ ...filters, dateTo: (e.target as HTMLInputElement).value })}
               />
 
@@ -123,6 +129,13 @@ export function OutboundList({ onRecordOutbound }: OutboundListProps) {
                 icon={<Search className="h-4 w-4" />}
               />
             </div>
+
+            {dateRangeInvalid && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                开始日期不能晚于结束日期
+              </div>
+            )}
 
             {hasActiveFilters && (
               <div className="flex items-center justify-end pt-2">
