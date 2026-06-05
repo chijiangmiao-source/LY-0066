@@ -59,14 +59,17 @@ interface SelectItemProps {
   value: string;
   children: preact.ComponentChildren;
   className?: string;
+  disabled?: boolean;
 }
 
-export function SelectItem({ value, children, className }: SelectItemProps) {
+export function SelectItem({ value, children, className, disabled }: SelectItemProps) {
   return (
     <SelectPrimitive.Item
       value={value}
+      disabled={disabled}
       className={cn(
         'relative flex items-center h-9 px-8 rounded-md text-sm text-gray-700 cursor-pointer select-none hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',
+        disabled && 'text-gray-400 cursor-not-allowed hover:bg-transparent',
         className
       )}
     >

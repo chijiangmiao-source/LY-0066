@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { Search, Edit2, Eye, Trash2, Plus, ClipboardCheck, Filter, X } from 'lucide-preact';
+import { Search, Edit2, Eye, Trash2, Plus, ClipboardCheck, Filter, X, LogOut } from 'lucide-preact';
 import type { Flower, RecordType, FlowerStatus } from '@/types';
 import { STATUS_COLORS, FLOWER_STATUSES } from '@/utils/constants';
 import { cn } from '@/utils/helpers';
@@ -13,6 +13,7 @@ interface FlowerListProps {
   onEdit: (flower: Flower) => void;
   onRecord: (type: RecordType, flower: Flower) => void;
   onStocktake: (flower: Flower) => void;
+  onOutbound: (flower?: Flower) => void;
   filterStatus?: FlowerStatus | 'all';
   filterType?: string;
   filterLocation?: string;
@@ -24,6 +25,7 @@ export function FlowerList({
   onEdit,
   onRecord,
   onStocktake,
+  onOutbound,
   filterStatus = 'all',
   filterType = 'all',
   filterLocation = 'all',
@@ -294,6 +296,16 @@ export function FlowerList({
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onOutbound(flower)}
+                          title="出库登记"
+                          disabled={flower.currentStock === 0 || flower.status === '停用'}
+                          className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 disabled:text-gray-300 disabled:hover:bg-transparent"
+                        >
+                          <LogOut className="h-4 w-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -324,6 +336,10 @@ export function FlowerList({
             onStocktake={() => {
               setDrawerOpen(false);
               onStocktake(selectedFlower);
+            }}
+            onOutbound={() => {
+              setDrawerOpen(false);
+              onOutbound(selectedFlower);
             }}
           />
         )}

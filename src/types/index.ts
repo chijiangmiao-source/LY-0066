@@ -1,5 +1,6 @@
 export type FlowerStatus = '正常' | '偏低' | '缺货' | '停用';
 export type RecordType = '补货' | '损耗' | '盘盈' | '盘亏';
+export type UsageType = '追思会' | '告别仪式' | '守灵' | '骨灰安放' | '日常祭扫' | '其他';
 
 export interface Flower {
   id: string;
@@ -28,6 +29,19 @@ export interface OperationRecord {
   diffQuantity?: number;
 }
 
+export interface OutboundRecord {
+  id: string;
+  flowerId: string;
+  flowerName?: string;
+  flowerType?: string;
+  quantity: number;
+  date: string;
+  recipient: string;
+  usage: UsageType;
+  remark: string;
+  createdAt: string;
+}
+
 export interface StocktakeData {
   flowerId: string;
   systemStock: number;
@@ -37,9 +51,17 @@ export interface StocktakeData {
   remark?: string;
 }
 
+export interface OutboundFilters {
+  usage: UsageType | 'all';
+  dateFrom: string;
+  dateTo: string;
+  recipient: string;
+}
+
 export interface FlowerStore {
   flowers: Flower[];
   records: OperationRecord[];
+  outboundRecords: OutboundRecord[];
   flowerTypes: string[];
   addFlower: (flower: Flower) => void;
   updateFlower: (id: string, flower: Partial<Flower>) => void;
@@ -49,4 +71,7 @@ export interface FlowerStore {
   getFlowerRecords: (flowerId: string) => OperationRecord[];
   calculateStatus: (currentStock: number, safeStock: number) => FlowerStatus;
   performStocktake: (data: StocktakeData) => { type: '盘盈' | '盘亏' | null; quantity: number } | null;
+  addOutboundRecord: (record: Omit<OutboundRecord, 'id' | 'createdAt'>) => OutboundRecord | null;
+  getFlowerOutboundRecords: (flowerId: string) => OutboundRecord[];
+  getFilteredOutboundRecords: (filters: Partial<OutboundFilters>) => OutboundRecord[];
 }

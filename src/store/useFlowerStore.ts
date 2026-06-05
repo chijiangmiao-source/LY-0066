@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Flower, OperationRecord, FlowerStatus, FlowerStore, StocktakeData } from '@/types';
-import { generateId, getTodayDateString } from '@/utils/helpers';
+import type { Flower, OperationRecord, FlowerStatus, FlowerStore, StocktakeData, OutboundRecord, OutboundFilters } from '@/types';
+import { generateId, getTodayDateString, isDateInRange } from '@/utils/helpers';
 import { FLOWER_TYPES } from '@/utils/constants';
 
 const initialFlowers: Flower[] = [
@@ -106,6 +106,33 @@ const initialRecords: OperationRecord[] = [
   },
 ];
 
+const initialOutboundRecords: OutboundRecord[] = [
+  {
+    id: generateId(),
+    flowerId: 'FL001',
+    flowerName: '白菊',
+    flowerType: '白菊',
+    quantity: 10,
+    date: getTodayDateString(),
+    recipient: '王家属',
+    usage: '告别仪式',
+    remark: '遗体告别仪式用花',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: generateId(),
+    flowerId: 'FL005',
+    flowerName: '康乃馨',
+    flowerType: '康乃馨',
+    quantity: 5,
+    date: getTodayDateString(),
+    recipient: '李家属',
+    usage: '追思会',
+    remark: '追思会布置',
+    createdAt: new Date().toISOString(),
+  },
+];
+
 const calculateStatus = (currentStock: number, safeStock: number): FlowerStatus => {
   if (currentStock === 0) return '缺货';
   if (currentStock < safeStock) return '偏低';
@@ -117,6 +144,7 @@ export const useFlowerStore = create<FlowerStore>()(
     (set, get) => ({
       flowers: initialFlowers,
       records: initialRecords,
+      outboundRecords: initialOutboundRecords,
       flowerTypes: FLOWER_TYPES,
 
       calculateStatus,
@@ -158,9 +186,16 @@ export const useFlowerStore = create<FlowerStore>()(
               )
             : state.records;
 
+          const updatedOutboundRecords = newId !== id
+            ? state.outboundRecords.map((record) =>
+                record.flowerId === id ? { ...record, flowerId: newId } : record
+              )
+            : state.outboundRecords;
+
           return {
             flowers: updatedFlowers,
             records: updatedRecords,
+            outboundRecords: updatedOutboundRecords,
           };
         });
       },
@@ -169,6 +204,7 @@ export const useFlowerStore = create<FlowerStore>()(
         set((state) => ({
           flowers: state.flowers.filter((flower) => flower.id !== id),
           records: state.records.filter((record) => record.flowerId !== id),
+          outboundRecords: state.outboundRecords.filter((record) => record.flowerId !== id),
         }));
       },
 
@@ -271,6 +307,63 @@ export const useFlowerStore = create<FlowerStore>()(
         });
 
         return { type, quantity };
+      },
+
+      addOutboundRecord: (recordData) => {
+        const state = get();
+        const flower = state.flowers.find((f) => f.id === recordData.flowerId);
+
+        if (!flower) return null;
+        if (flower.currentStock < recordData.quantity) return null;
+
+        const newRecord: OutboundRecord = {
+          ...recordData,
+          flowerName: flower.name,
+          flowerType: flower.type,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+        };
+
+        const newStock = flower.currentStock - recordData.quantity;
+
+        set((state) => {
+          const updatedFlowers = state.flowers.map((fl) => {
+            if (fl.id === recordData.flowerId) {
+              return {
+                ...fl,
+                currentStock: newStock,
+                status: calculateStatus(newStock, fl.safeStock),
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return fl;
+          });
+
+          return {
+            outboundRecords: [newRecord, ...state.outboundRecords],
+            flowers: updatedFlowers,
+          };
+        });
+
+        return newRecord;
+      },
+
+      getFlowerOutboundRecords: (flowerId) => {
+        return get().outboundRecords
+          .filter((r) => r.flowerId === flowerId)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      },
+
+      getFilteredOutboundRecords: (filters: Partial<OutboundFilters>) => {
+        const { usage, dateFrom, dateTo, recipient } = filters;
+        return get().outboundRecords
+          .filter((r) => {
+            if (usage && usage !== 'all' && r.usage !== usage) return false;
+            if ((dateFrom || dateTo) && !isDateInRange(r.date, dateFrom || '', dateTo || '')) return false;
+            if (recipient && !r.recipient.includes(recipient.trim())) return false;
+            return true;
+          })
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       },
     }),
     {
